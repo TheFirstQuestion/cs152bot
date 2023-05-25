@@ -30,7 +30,7 @@ with open(token_path) as f:
 
 class ModBot(discord.Client):
     def __init__(self):
-        intents = discord.Intents.default()
+        intents = discord.Intents.all()
         intents.message_content = True
         super().__init__(command_prefix='.', intents=intents)
         self.group_num = None
@@ -75,16 +75,24 @@ class ModBot(discord.Client):
         else:
             await self.handle_dm(message)
 
-    async def on_raw_reaction_add(self, message):
+    async def on_raw_reaction_add(self, reaction):
         '''
         Called when a message has a reaction added.
         '''
-        # Ignore reactions from the bot
-        if message.user_id == self.user.id:
+        # Ignore reactions from the bot, and ignore reactions NOT on a DM
+        if reaction.user_id == self.user.id or reaction.guild_id:
             return
 
-        print(message)
-        # Sample: <RawReactionActionEvent message_id=1110666813022425098 user_id=1098756525004173402 channel_id=1103033289041789052 guild_id=1103033282779676743 emoji=<PartialEmoji animated=False name='👍' id=None> event_type='REACTION_ADD' member=<Member id=1098756525004173402 name='stevengo' discriminator='1519' bot=False nick=None guild=<Guild id=1103033282779676743 name='CS 152 - Sp23' shard_id=0 chunked=False member_count=235>>>
+        author_id = reaction.user_id
+
+        # Only respond to reactions if we are in reporting flow
+        if author_id not in self.reports:
+            return
+
+        # Pass this info to the report, and send response
+        report = self.reports[author_id]
+        reportResponse = await report.handle_reaction(reaction)
+        await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
 
     ####################################################### Handlers #####################################################
 
@@ -107,25 +115,20 @@ class ModBot(discord.Client):
         if author_id not in self.reports:
             self.reports[author_id] = Report(self)
 
+        report = self.reports[author_id]
+
+        # TODO: add ability for original message of "report <link>" to start a report with that link
+
         # Let the report class handle this message; forward all the messages it returns to us
-        messagesFromReport = await self.reports[author_id].handle_message(message)
-        # Send the bot's response message
-        responseText = ""
-        for m in messagesFromReport["messages"]:
-            responseText += m + "\n"
-        botResponse = await message.channel.send(responseText)
-        # Add any reactions to the bot response
-        for r in messagesFromReport["reactions"]:
-            await botResponse.add_reaction(r)
+        reportResponse = await report.handle_message(message)
+        await self.send_report_response(reportResponse, message.channel)
 
         # If the report is complete or cancelled, remove it from our map
-        if self.reports[author_id].report_complete():
-
+        if report.report_is_complete():
             # Send the completed report to the mod channel
-            # TODO: don't do this if the report was cancelled...
-            reportedMessage = self.reports[author_id].message
-
-            await self.mod_channels[reportedMessage.guild.id].send(f'{message.author.mention} has reported this message from {reportedMessage.author.mention}: ```{reportedMessage.author.name}: {reportedMessage.content}``` \n See the message in context: {reportedMessage.jump_url}')
+            reportedMessage = report.message
+            await self.mod_channels[reportedMessage.guild.id].send(f'{message.author.mention} has reported this message from {reportedMessage.author.mention}: ```{reportedMessage.author.name}: {reportedMessage.content}``` \n See the message in context: {reportedMessage.jump_url} \n\n Comments: {report.comment}')
+            # TODO: make a util function for how to format messages, so consistent for user + mod
 
             # Remove report from map
             self.reports.pop(author_id)
@@ -158,6 +161,17 @@ class ModBot(discord.Client):
         shown in the mod channel. 
         '''
         return "Evaluated: '" + text + "'"
+
+    async def send_report_response(self, response, channel):
+        # Send the bot's response message
+        responseText = ""
+        for m in response["messages"]:
+            responseText += m + "\n"
+        botResponse = await channel.send(responseText)
+
+        # Add any bot reactions to the response
+        for r in response["reactions"]:
+            await botResponse.add_reaction(r)
 
 
 client = ModBot()
