@@ -13,8 +13,18 @@ class State(Enum):
     REPORT_CANCELLED = auto()
     RESOLVED_BY_MOD = auto()
 
+    # Daniel edits:
+    BULLYING_TYPE_IDENTIFIED = auto()
+    DANGER_IDENTIFIED = auto()
+    WAITING_ON_BLOCK = auto()
+    BLOCK_CHOSEN = auto()
+
 
 CLASSIFICATION_EMOJIS = ["💩", "👿", "💳", "🔪", "✍️", "🙅"]
+DANGER_EMOJIS = ["❌", "⭕️"]
+BLOCK_EMOJIS = ["❌", "⭕️"]
+DM_SETTING_EMOJIS = ["❌", "⭕️"]
+
 
 
 class Report:
@@ -102,7 +112,7 @@ class Report:
         #   guild=<Guild id=1103033282779676743 name='CS 152 - Sp23' shard_id=0 chunked=False member_count=235>
         # >>
         emoji = reaction.emoji.name
-
+        
         if self.state == State.MESSAGE_IDENTIFIED and emoji in CLASSIFICATION_EMOJIS:
             if emoji == "🙅":
                 self.state = State.REPORT_CANCELLED
@@ -112,6 +122,49 @@ class Report:
                 return {"messages": ["Please help us understand why this message may violate our policies. Your message will be sent to our moderation team for review."], "reactions": []}
             else:
                 return {"messages": ["We have received your report. Our moderation team will review the report and notify you of the outcome  of the review."], "reactions": []}
+
+        return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
+
+
+    async def handle_imminent_danger(self, danger):
+        emoji = danger.emoji.name
+        if self.state == State.BULLYING_TYPE_IDENTIFIED and emoji in DANGER_EMOJIS:
+        # DANGER_EMOJIS = ["❌", "⭕️"]
+            if emoji == "❌":
+                self.state = State.DANGER_IDENTIFIED
+                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome  of the review.The reported post may be removed; and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."], "reactions": []}
+            elif emoji == "⭕️":
+                self.state = State.DANGER_IDENTIFIED
+                return {"messages": ["Please help us understand why this message may violate our policies. Your message will be sent to our moderation team for review."], "reactions": []}
+
+        return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
+
+    async def handle_block(self, block):
+        emoji = block.emoji.name
+        if self.state == State.DANGER_IDENTIFIED and emoji in BLOCK_EMOJIS:
+        # DANGER_EMOJIS = ["❌", "⭕️"]
+            if emoji == "❌":
+                self.state = State.BLOCK_CHOSEN
+                return {"messages": ["You have chosen not to block the user."], "reactions": []}
+            elif emoji == "⭕️":
+                self.state = State.BLOCK_CHOSEN
+                return {"messages": ["We have blocked the user from accessing your profile or directly messaging you. Thank you for your report."], "reactions": []}
+
+        return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
+
+    # FILTER FUNCTION DEPENDING ON NAME COUNT
+    async def handle
+
+    async def handle_dm_setting(self, dm_setting):
+        emoji = dm_setting.emoji.name
+        if self.state == State.DANGER_IDENTIFIED and emoji in DM_SETTING_EMOJIS:
+        # DANGER_EMOJIS = ["❌", "⭕️"]
+            if emoji == "❌":
+                self.state = State.DANGER_IDENTIFIED
+                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome  of the review.The reported post may be removed; and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."], "reactions": []}
+            elif emoji == "⭕️":
+                self.state = State.DANGER_IDENTIFIED
+                return {"messages": ["Please help us understand why this message may violate our policies. Your message will be sent to our moderation team for review."], "reactions": []}
 
         return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
 
