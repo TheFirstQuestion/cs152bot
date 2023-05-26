@@ -169,10 +169,11 @@ class ModBot(discord.Client):
         # await mod_channel.send(self.code_format(scores))
 
     async def handle_report_complete(self, report):
+        report.sent_to_mods = True
         # Send the completed report to the mod channel
         # TODO: instead of showing emojis, show what that emoji means
         mod_channel = self.mod_channels[report.message.guild.id]
-        report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: {report.message_as_quote()} \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
+        report_summary = f'{report.message_context()} \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
         report_summary += 'What is the status of this report?\n'
         report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
         report_summary += '📝 The message violates community standards but the report was filed *incorrectly*.\n'
@@ -211,7 +212,7 @@ class ModBot(discord.Client):
         await report.actor.send(report_summary_actor)
 
     async def check_report_status(self, report):
-        if report.report_is_complete():
+        if report.report_is_complete() and not report.sent_to_mods:
             await self.handle_report_complete(report)
         if report.report_is_resolved():
             await self.handle_mod_resolution(report)

@@ -41,6 +41,7 @@ class Report:
         self.reporter = client.get_user(reporter)
         self.actor = None
         self.ruling = None
+        self.sent_to_mods = False
 
     async def handle_message(self, message):
         '''
@@ -171,9 +172,10 @@ class Report:
         if self.report_is_complete() and emoji in MOD_STATUS_EMOJIS:
             if emoji == '✅':
                 self.state = State.MOD_CHOOSE_PENALTY
-                return {"messages": ["This report has been classified correctly.",
+                return {"messages": [self.message_context(),
+                                     "This report has been classified correctly.",
                                      "Thanks for taking care of our community!",
-                                     "Should we take any action for the reported user?"
+                                     "Should we take any action for the reported user?",
                                      "👁️ No actions should be taken aginst the reported user at this time.",
                                      "😡 Ban the reported user.",
                                      "‼️ Add one strike to the reported user and send a warning message to them.",
@@ -181,7 +183,8 @@ class Report:
                         "reactions": ['👁️', '😡', '‼️', '🧊']}
             elif emoji == '📝':
                 self.state = State.MOD_RECLASSIFY
-                return {"messages": ["This report has been classified *incorrectly*.",
+                return {"messages": [self.message_context(),
+                                     "This report has been classified *incorrectly*.",
                                      "Please choose the correct classification.",
                                      "💩 This message contains content that is inappropriate for this context and people shouldn't see it.",
                                      "👿 This message is harassment, bullying, or generally mean or hurtful.",
@@ -199,9 +202,11 @@ class Report:
                 self.ruling = "Escalated to the Tier II moderator team."
                 return {"messages": ["This report has been marked as *false* and forwarded to the Tier II moderator team.", "Thanks for taking care of our community!"], "reactions": []}
 
+        # For reclassification
         if self.state == State.MOD_RECLASSIFY and emoji in CLASSIFICATION_EMOJIS:
             self.state = State.MOD_CHOOSE_PENALTY
-            return {"messages": ["This report has been classified correctly.",
+            return {"messages": [self.message_context(),
+                                 "This report has been classified correctly.",
                                  "Thanks for taking care of our community!",
                                  "Should we take any action for the reported user?",
                                  "👁️ No actions should be taken aginst the reported user at this time.",
@@ -211,13 +216,18 @@ class Report:
                     "reactions": ['👁️', '😡', '‼️', '🧊']}
 
         if self.state == State.MOD_CHOOSE_PENALTY and emoji in MOD_PENALTY_EMOJIS:
+            self.state = State.RESOLVED_BY_MOD
             if emoji == "👁️":
+                self.ruling = "No action taken."
                 return {"messages": ["No action has been taken against the user at this time"], "reactions": []}
             elif emoji == "😡":
+                self.ruling = "User has been removed."
                 return {"messages": ["The reported user has been removed."], "reactions": []}
             elif emoji == "‼️":
+                self.ruling = "User received a strike."
                 return {"messages": ["A strike message has been sent to the reported user."], "reactions": []}
             elif emoji == "🧊":
+                self.ruling = "User has been suspended."
                 return {"messages": ["The reported user has been suspended."], "reactions": []}
 
         # Error handling: don't react to irrelevant emojis
@@ -227,6 +237,9 @@ class Report:
 
     def message_as_quote(self):
         return f"```{self.actor.name}: {self.message.content}```"
+
+    def message_context(self):
+        return f"{self.reporter.mention} has reported this message from {self.actor.mention}: {self.message_as_quote()}"
 
     ###################################################### Boolean Helpers ###############################################
     def report_is_complete(self):
