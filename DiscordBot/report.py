@@ -11,8 +11,6 @@ class State(Enum):
     WAITING_ON_SECONDARY_CLASSIFICATION = auto()
     BULLYING_TYPE_IDENTIFIED = auto()
     DANGER_IDENTIFIED = auto()
-    WAITING_ON_BLOCK = auto()
-    BLOCK_CHOSEN = auto()
     WAITING_ON_MESSAGE = auto()
     REPORT_COMPLETE = auto()
     REPORT_CANCELLED = auto()
@@ -100,11 +98,7 @@ class Report:
             self.state = State.REPORT_COMPLETE
             return {"messages": ["We have received your report. Our moderation team will review the and notify you of the outcome  of the review."], "reactions": []}
 
-        if self.state == State.DANGER_IDENTIFIED:
-            self.state = State.WAITING_ON_BLOCK
-            return {"messages": ["We have received your report. Our moderation team will review the report and notify you of the outcome  of the review.", f"Would you like to block this user {self.actor.mention}?"], "reactions": BLOCK_EMOJIS}
-
-            # Base case -- something has gone wrong if we reach this
+        # Base case -- something has gone wrong if we reach this
         self.state = State.REPORT_CANCELLED
         return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
 
@@ -143,22 +137,31 @@ class Report:
         if self.state == State.BULLYING_TYPE_IDENTIFIED and emoji in DANGER_EMOJIS:
             if emoji == "🆗":
                 self.state = State.DANGER_IDENTIFIED
-                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. The reported post may be removed; and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."],
-                        "reactions": []}
+                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. The reported post may be removed; and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."
+                                     "\n",
+                                     f"Would you like to block {self.actor.mention}?",
+                                     f"Would you like to block {self.actor.mention}?",
+                                     "🛑 Block this user from direct messaging me and accessing my profile.",
+                                     "▶ Allow them to message me and look at my profile."],
+                        "reactions": BLOCK_EMOJIS}
             elif emoji == "⚡":
                 self.state = State.DANGER_IDENTIFIED
                 return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. Your report may be sent to local law enforcement authorities where necessary.",
-                                     "",
-                                     "**Please contact your local authorities.**", ],
-                        "reactions": []}
+                                     "\n",
+                                     "**Please contact your local authorities.**",
+                                     "\n",
+                                     f"Would you like to block {self.actor.mention}?",
+                                     "🛑 Block this user from direct messaging me and accessing my profile.",
+                                     "▶ Allow them to message me and look at my profile."],
+                        "reactions": BLOCK_EMOJIS}
 
         # Block the user?
-        if self.state == State.WAITING_ON_BLOCK and emoji in BLOCK_EMOJIS:
+        if self.state == State.DANGER_IDENTIFIED and emoji in BLOCK_EMOJIS:
             if emoji == "▶":
-                self.state = State.BLOCK_CHOSEN
+                self.state = State.REPORT_COMPLETE
                 return {"messages": ["You have chosen not to block the user."], "reactions": []}
             elif emoji == "🛑":
-                self.state = State.BLOCK_CHOSEN
+                self.state = State.REPORT_COMPLETE
                 return {"messages": ["This user is no longer able to access your profile or direct message you."], "reactions": []}
 
         # Error handling: don't react to irrelevant emojis

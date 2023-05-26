@@ -79,23 +79,32 @@ class ModBot(discord.Client):
         '''
         Called when a message has a reaction added.
         '''
-        # Ignore reactions from the bot, and ignore reactions NOT on a DM
-        if reaction.user_id == self.user.id or reaction.guild_id:
+        # Ignore reactions from the bot
+        if reaction.user_id == self.user.id:
             return
 
-        author_id = reaction.user_id
+        # print(reaction)
 
-        # Only respond to reactions if we are in reporting flow
-        if author_id not in self.reports:
-            return
+        # Check if this message was sent in a server ("guild") or if it's a DM
+        if reaction.guild_id:
+            # Check if message was sent in the mod channel
+            if reaction.channel_id == self.mod_channels[reaction.guild_id].id:
+                print("response in mod channel!")
+        else:
+            # DM
+            author_id = reaction.user_id
 
-        # Pass this info to the report, and send response
-        report = self.reports[author_id]
-        reportResponse = await report.handle_reaction(reaction)
-        await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
+            # Only respond to reactions if we are in reporting flow
+            if author_id not in self.reports:
+                return
 
-        # Check if the message is complete
-        await self.check_handle_report_complete(report)
+            # Pass this info to the report, and send response
+            report = self.reports[author_id]
+            reportResponse = await report.handle_reaction(reaction)
+            await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
+
+            # Check if the message is complete
+            await self.check_handle_report_complete(report)
 
     ####################################################### Handlers #####################################################
 
@@ -135,35 +144,33 @@ class ModBot(discord.Client):
             return
 
         # Forward the message to the mod channel
+        # STEVEN: I commented this out just bc it was annoying
         mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+        # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
 
         scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
+        # await mod_channel.send(self.code_format(scores))
 
     async def check_handle_report_complete(self, report):
         if report.report_is_complete():
-            # Send the completed report to the mod channel
-            await self.mod_channels[report.message.guild.id].send(f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n\n Responses: {" ".join(report.responses)} \n\n Comments: {report.comment}')
+            # Remove report from map
+            # self.reports.pop(report.reporter.id)
 
             # Send the completed report to the mod channel
             mod_channel = self.mod_channels[report.message.guild.id]
-            report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n\n'
-            report_summary += 'What action should be taken to the reported actor?\n'
-            report_summary += '1. UMMMMM The report was classified correctly.\n'
-            report_summary += '2. The message violates community standards but the report was not filed under the correct category.\n'
-            report_summary += '3. The report is a serious issue that needs to be escalated to a higher level.\n'
-            report_summary += '4. The reported incident does not violate community standards.'
+            report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
+            report_summary += 'What is the status of this report?\n'
+            report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
+            report_summary += '📝 The message violates community standards but the report was filed *incorrectly*.\n'
+            report_summary += '🆙 The report is a serious issue that needs to be escalated to a higher level.\n'
+            report_summary += '👍 The reported incident does not violate community standards.'
 
             report_message = await mod_channel.send(report_summary)
-            
+
             # Add reactions for the available options
-            options = ['1️⃣', '2️⃣', '3️⃣', '4️⃣']
+            options = ['✅', '📝', '🆙', '👍']
             for option in options:
                 await report_message.add_reaction(option)
-                
-            # Remove report from map
-            self.reports.pop(report.reporter.id)
 
     ################################################# Helper Functions ##################################################
 
