@@ -15,6 +15,8 @@ class State(Enum):
     WAITING_ON_MESSAGE = auto()
     REPORT_COMPLETE = auto()
     REPORT_CANCELLED = auto()
+    MOD_CHOOSE_PENALTY = auto()
+    MOD_RECLASSIFY = auto()
     RESOLVED_BY_MOD = auto()
 
 
@@ -23,6 +25,8 @@ SECONDARY_CLASSIFICATION_EMOJIS = ["🧛", "🕵", "🦹"]
 DANGER_EMOJIS = ["⚡", "🆗"]
 BLOCK_EMOJIS = ["🛑", "▶"]
 MOD_STATUS_EMOJIS = ['✅', '📝', '🆙', '👍']
+MOD_PENALTY_EMOJIS = ['👁️', '😡', '‼️', '🧊'] # no, ban, strike, suspend
+
 
 # TODO: make a util function for how to format reports, so consistent for user + mod
 
@@ -171,15 +175,56 @@ class Report:
         # Mod response about status of report
         if self.report_is_complete() and emoji in MOD_STATUS_EMOJIS:
             print("got mod reaction")
-            if emoji == '🆙':
+            if emoji == '✅':
+                self.state = State.MOD_CHOOSE_PENALTY
+                return {"messages": ["This report has been classified correctly.", 
+                                    "Thanks for taking care of our community!", 
+                                    "Should we take any action for the reported user?"
+                                    "👁️ No actions should be taken aginst the reported user at this time.", 
+                                    "😡 Ban the reported user.", 
+                                    "‼️ Add one strike to the reported user and send a warning message to them.", 
+                                    "🧊 Suspend the reported user."], 
+                                    "reactions": ['👁️', '😡', '‼️', '🧊']}
+            elif emoji == '📝':
+                self.state = State.MOD_RECLASSIFY
+                return {"messages": ["This report has been classified *incorrectly*.", 
+                                    "Please choose the correct classification.",
+                                    "💩 This message contains content that is inappropriate for this context and people shouldn't see it.",
+                                    "👿 This message is harassment, bullying, or generally mean or hurtful.",
+                                    "💳 This is a spam message or a scam, not a real person genuinely trying to interact.",
+                                    "🔪 This message could lead to bad stuff happening offline.",
+                                    "✍️ None of these, some other reason.",
+                                    "🙅 The reporter didn't mean to report this message! No action needed."], 
+                                    "reactions": CLASSIFICATION_EMOJIS}
+            elif emoji == '🆙':
                 self.state = State.RESOLVED_BY_MOD
                 return {"messages": ["This report has been escalated to the Tier II moderator team.", "Thanks for taking care of our community!"], "reactions": []}
             elif emoji == '👍':
                 self.state = State.RESOLVED_BY_MOD
                 return {"messages": ["This report has been marked as *false* and forwarded to the Tier II moderator team.", "Thanks for taking care of our community!"], "reactions": []}
 
-        # Error handling: don't react to irrelevant emojis
+        if self.state == State.MOD_RECLASSIFY and emoji in CLASSIFICATION_EMOJIS:
+            self.state = State.MOD_CHOOSE_PENALTY
+            return {"messages": ["This report has been classified correctly.", 
+                                "Thanks for taking care of our community!", 
+                                "Should we take any action for the reported user?"
+                                "👁️ No actions should be taken aginst the reported user at this time.", 
+                                "😡 Ban the reported user.", 
+                                "‼️ Add one strike to the reported user and send a warning message to them.", 
+                                "🧊 Suspend the reported user."], 
+                                "reactions": ['👁️', '😡', '‼️', '🧊']}
 
+        if self.state == State.MOD_CHOOSE_PENALTY and emoji in MOD_PENALTY_EMOJIS:
+            if emoji == "👁️":
+                return {"messages": ["No action has been taken against the user at this time"], "reactions": []}
+            elif emoji == "😡":
+                return {"messages": ["The reported user has been removed."], "reactions": []}
+            elif emoji == "‼️":
+                return {"messages": ["A strike message has been sent to the reported user."], "reactions": []}
+            elif emoji == "🧊":
+                return {"messages": ["The reported user has been suspended."], "reactions": []}
+
+        # Error handling: don't react to irrelevant emojis
     def report_is_complete(self):
         return self.state == State.REPORT_COMPLETE or self.state == State.DANGER_IDENTIFIED
 
