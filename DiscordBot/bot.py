@@ -106,6 +106,9 @@ class ModBot(discord.Client):
                 reportResponse = await report.handle_reaction(reaction)
                 await self.send_report_response(reportResponse, channel)
 
+                # Check if the report is complete
+                await self.check_report_status(report)
+
         else:
             # DM
             author_id = reaction.user_id
@@ -119,9 +122,8 @@ class ModBot(discord.Client):
             reportResponse = await report.handle_reaction(reaction)
             await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
 
-        # Check if the report is complete
-        await self.check_report_status(report)
-        # TODO: tell users the relevant info
+            # Check if the report is complete
+            await self.check_report_status(report)
 
     ####################################################### Handlers #####################################################
 
