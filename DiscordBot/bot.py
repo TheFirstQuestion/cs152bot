@@ -146,6 +146,22 @@ class ModBot(discord.Client):
             # Send the completed report to the mod channel
             await self.mod_channels[report.message.guild.id].send(f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n\n Responses: {" ".join(report.responses)} \n\n Comments: {report.comment}')
 
+            # Send the completed report to the mod channel
+            mod_channel = self.mod_channels[report.message.guild.id]
+            report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n\n'
+            report_summary += 'What action should be taken to the reported actor?\n'
+            report_summary += '1. UMMMMM The report was classified correctly.\n'
+            report_summary += '2. The message violates community standards but the report was not filed under the correct category.\n'
+            report_summary += '3. The report is a serious issue that needs to be escalated to a higher level.\n'
+            report_summary += '4. The reported incident does not violate community standards.'
+
+            report_message = await mod_channel.send(report_summary)
+            
+            # Add reactions for the available options
+            options = ['1️⃣', '2️⃣', '3️⃣', '4️⃣']
+            for option in options:
+                await report_message.add_reaction(option)
+                
             # Remove report from map
             self.reports.pop(report.reporter.id)
 
