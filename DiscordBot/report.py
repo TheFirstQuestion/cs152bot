@@ -42,6 +42,7 @@ class Report:
         self.actor = None
         self.ruling = None
         self.sent_to_mods = False
+        self.auto_escalate = False
 
     async def handle_message(self, message):
         '''
@@ -139,6 +140,7 @@ class Report:
 
         # Imminent danger?
         if self.state == State.BULLYING_TYPE_IDENTIFIED and emoji in DANGER_EMOJIS:
+            self.responses.append(emoji)
             if emoji == "🆗":
                 self.state = State.DANGER_IDENTIFIED
                 return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. The reported post may be removed, and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."
@@ -149,6 +151,8 @@ class Report:
                         "reactions": BLOCK_EMOJIS}
             elif emoji == "⚡":
                 self.state = State.DANGER_IDENTIFIED
+                self.auto_escalate = True
+                self.ruling = "Escalated to the Tier III moderator team."
                 return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. Your report may be sent to local law enforcement authorities where necessary.",
                                      "\n",
                                      "**Please contact your local authorities.**",
@@ -161,6 +165,7 @@ class Report:
         # Block the user?
         # the report should be COMPLETED and SUBMITTED here, responding to these is optional
         if self.state == State.DANGER_IDENTIFIED and emoji in BLOCK_EMOJIS:
+            self.responses.append(emoji)
             if emoji == "▶":
                 self.state = State.REPORT_COMPLETE
                 return {"messages": ["You have chosen not to block the user."], "reactions": []}
@@ -170,6 +175,7 @@ class Report:
 
         # Mod response about status of report
         if self.report_is_complete() and emoji in MOD_STATUS_EMOJIS:
+            self.responses.append(emoji)
             if emoji == '✅':
                 self.state = State.MOD_CHOOSE_PENALTY
                 return {"messages": [self.message_context(),
@@ -216,6 +222,7 @@ class Report:
                     "reactions": ['👁️', '😡', '‼️', '🧊']}
 
         if self.state == State.MOD_CHOOSE_PENALTY and emoji in MOD_PENALTY_EMOJIS:
+            self.responses.append(emoji)
             self.state = State.RESOLVED_BY_MOD
             if emoji == "👁️":
                 self.ruling = "No action taken."

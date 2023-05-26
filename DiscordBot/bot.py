@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import requests
-from report import Report
+from report import Report, State
 import pdb
 
 # Set up logging to the console
@@ -170,9 +170,15 @@ class ModBot(discord.Client):
 
     async def handle_report_complete(self, report):
         report.sent_to_mods = True
-        # Send the completed report to the mod channel
-        # TODO: instead of showing emojis, show what that emoji means
         mod_channel = self.mod_channels[report.message.guild.id]
+
+        if report.auto_escalate:
+            report_message = await mod_channel.send(f'{report.message_context()} \n **This message has been auto-escalated and no action is required.**')
+            report.state = State.RESOLVED_BY_MOD
+            return
+
+        # Send the completed report to the mod channel
+        # TODO: instead of just showing emojis, show what that emoji means
         report_summary = f'{report.message_context()} \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
         report_summary += 'What is the status of this report?\n'
         report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
@@ -202,14 +208,15 @@ class ModBot(discord.Client):
 
         await report.reporter.send(report_summary_reporter)
 
-        # Send the resolution information to the actor
-        report_summary_actor = f"Your message has been reported and reviewed:"
-        report_summary_actor += f"{report.message_as_quote()}\n"
-        report_summary_actor += f"See the message in context: {report.message.jump_url} \n"
-        report_summary_actor += f"**Outcome: {report.ruling}**\n"
-        report_summary_actor += "You are able to appeal this decision."
+        # Send the resolution information to the actor, unless there is a threat of danger
+        if not report.auto_escalate:
+            report_summary_actor = f"Your message has been reported and reviewed:"
+            report_summary_actor += f"{report.message_as_quote()}\n"
+            report_summary_actor += f"See the message in context: {report.message.jump_url} \n"
+            report_summary_actor += f"**Outcome: {report.ruling}**\n"
+            report_summary_actor += "You are able to appeal this decision."
 
-        await report.actor.send(report_summary_actor)
+            await report.actor.send(report_summary_actor)
 
     async def check_report_status(self, report):
         if report.report_is_complete() and not report.sent_to_mods:
