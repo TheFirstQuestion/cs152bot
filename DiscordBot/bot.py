@@ -192,7 +192,6 @@ class ModBot(discord.Client):
         self.reports.pop(report.reporter.id)
 
         # TODO: provide more context/details
-
         # Send the resolution information to the reporter
         report_summary_reporter = f"Your report has been reviewed."
         report_summary_reporter += f"{report.message_as_quote()}\n"
