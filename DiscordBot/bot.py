@@ -83,13 +83,32 @@ class ModBot(discord.Client):
         if reaction.user_id == self.user.id:
             return
 
-        # print(reaction)
-
         # Check if this message was sent in a server ("guild") or if it's a DM
         if reaction.guild_id:
             # Check if message was sent in the mod channel
             if reaction.channel_id == self.mod_channels[reaction.guild_id].id:
-                print("response in mod channel!")
+                channel = self.get_channel(reaction.channel_id)
+                message = await channel.fetch_message(reaction.message_id)
+
+                # Need to get the reporter id
+                # Regex: https://regex101.com/r/2ERBIO/1
+                author_id = int(
+                    re.search(r"\<@(\d*)\>", message.content).group(1))
+
+                # Only respond to reactions if we are in reporting flow
+                if author_id not in self.reports:
+                    print("no report for this user")
+                    return
+
+                # TODO: probably want to do a thread on the mod side
+                # Pass this info to the report, and send response
+                report = self.reports[author_id]
+                reportResponse = await report.handle_reaction(reaction)
+                await self.send_report_response(reportResponse, channel)
+
+                # Check if the message is complete
+                await self.check_handle_report_complete(report)
+
         else:
             # DM
             author_id = reaction.user_id
@@ -100,11 +119,13 @@ class ModBot(discord.Client):
 
             # Pass this info to the report, and send response
             report = self.reports[author_id]
+            print(report)
             reportResponse = await report.handle_reaction(reaction)
             await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
 
             # Check if the message is complete
             await self.check_handle_report_complete(report)
+            # TODO: tell users the relevant info
 
     ####################################################### Handlers #####################################################
 
@@ -152,13 +173,15 @@ class ModBot(discord.Client):
         # await mod_channel.send(self.code_format(scores))
 
     async def check_handle_report_complete(self, report):
+        # TODO: add wrapper to this that runs this / checks for mod resolution depending on report status
         if report.report_is_complete():
             # Remove report from map
             # self.reports.pop(report.reporter.id)
 
             # Send the completed report to the mod channel
             mod_channel = self.mod_channels[report.message.guild.id]
-            report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
+            report_summary = f"_{report.report_id}_ \n"
+            report_summary += f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
             report_summary += 'What is the status of this report?\n'
             report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
             report_summary += '📝 The message violates community standards but the report was filed *incorrectly*.\n'
@@ -168,6 +191,7 @@ class ModBot(discord.Client):
             report_message = await mod_channel.send(report_summary)
 
             # Add reactions for the available options
+            # Must be same as MOD_STATUS_EMOJIS
             options = ['✅', '📝', '🆙', '👍']
             for option in options:
                 await report_message.add_reaction(option)
@@ -176,16 +200,16 @@ class ModBot(discord.Client):
 
     def eval_text(self, message):
         ''''
-        TODO: Once you know how you want to evaluate messages in your channel, 
-        insert your code here! This will primarily be used in Milestone 3. 
+        TODO: Once you know how you want to evaluate messages in your channel,
+        insert your code here! This will primarily be used in Milestone 3.
         '''
         return message
 
     def code_format(self, text):
         ''''
-        TODO: Once you know how you want to show that a message has been 
-        evaluated, insert your code here for formatting the string to be 
-        shown in the mod channel. 
+        TODO: Once you know how you want to show that a message has been
+        evaluated, insert your code here for formatting the string to be
+        shown in the mod channel.
         '''
         return "Evaluated: '" + text + "'"
 

@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import discord
 import re
+import uuid
 
 
 class State(Enum):
@@ -21,6 +22,7 @@ CLASSIFICATION_EMOJIS = ["💩", "👿", "💳", "🔪", "✍️", "🙅"]
 SECONDARY_CLASSIFICATION_EMOJIS = ["🧛", "🕵", "🦹"]
 DANGER_EMOJIS = ["⚡", "🆗"]
 BLOCK_EMOJIS = ["🛑", "▶"]
+MOD_STATUS_EMOJIS = ['✅', '📝', '🆙', '👍']
 
 # TODO: make a util function for how to format reports, so consistent for user + mod
 
@@ -38,6 +40,7 @@ class Report:
         self.responses = []
         self.reporter = client.get_user(reporter)
         self.actor = None
+        self.report_id = uuid.uuid4()
 
     async def handle_message(self, message):
         '''
@@ -137,7 +140,7 @@ class Report:
         if self.state == State.BULLYING_TYPE_IDENTIFIED and emoji in DANGER_EMOJIS:
             if emoji == "🆗":
                 self.state = State.DANGER_IDENTIFIED
-                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. The reported post may be removed; and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."
+                return {"messages": ["We have received your report. Our moderation team will review this message and notify you of the outcome of the review. The reported post may be removed, and the account posting violating messages may be suspended. Your report may be sent to local law enforcement authorities where necessary."
                                      "\n",
                                      f"Would you like to block {self.actor.mention}?",
                                      f"Would you like to block {self.actor.mention}?",
@@ -156,6 +159,7 @@ class Report:
                         "reactions": BLOCK_EMOJIS}
 
         # Block the user?
+        # the report should be COMPLETED and SUBMITTED here, responding to these is optional
         if self.state == State.DANGER_IDENTIFIED and emoji in BLOCK_EMOJIS:
             if emoji == "▶":
                 self.state = State.REPORT_COMPLETE
@@ -164,7 +168,20 @@ class Report:
                 self.state = State.REPORT_COMPLETE
                 return {"messages": ["This user is no longer able to access your profile or direct message you."], "reactions": []}
 
+        # Mod response about status of report
+        if self.report_is_complete() and emoji in MOD_STATUS_EMOJIS:
+            print("got mod reaction")
+            if emoji == '🆙':
+                self.state = State.RESOLVED_BY_MOD
+                return {"messages": ["This report has been escalated to the Tier II moderator team.", "Thanks for taking care of our community!"], "reactions": []}
+            elif emoji == '👍':
+                self.state = State.RESOLVED_BY_MOD
+                return {"messages": ["This report has been marked as *false* and forwarded to the Tier II moderator team.", "Thanks for taking care of our community!"], "reactions": []}
+
         # Error handling: don't react to irrelevant emojis
 
     def report_is_complete(self):
-        return self.state == State.REPORT_COMPLETE
+        return self.state == State.REPORT_COMPLETE or self.state == State.DANGER_IDENTIFIED
+
+    def report_in_review(self):
+        return self.report_is_complete() and self.state != State.RESOLVED_BY_MOD
