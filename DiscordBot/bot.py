@@ -106,9 +106,6 @@ class ModBot(discord.Client):
                 reportResponse = await report.handle_reaction(reaction)
                 await self.send_report_response(reportResponse, channel)
 
-                # Check if the message is complete
-                await self.check_handle_report_complete(report)
-
         else:
             # DM
             author_id = reaction.user_id
@@ -119,13 +116,12 @@ class ModBot(discord.Client):
 
             # Pass this info to the report, and send response
             report = self.reports[author_id]
-            print(report)
             reportResponse = await report.handle_reaction(reaction)
             await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
 
-            # Check if the message is complete
-            await self.check_handle_report_complete(report)
-            # TODO: tell users the relevant info
+        # Check if the report is complete
+        await self.check_report_status(report)
+        # TODO: tell users the relevant info
 
     ####################################################### Handlers #####################################################
 
@@ -157,7 +153,7 @@ class ModBot(discord.Client):
         await self.send_report_response(reportResponse, message.channel)
 
         # Check if the message is complete
-        await self.check_handle_report_complete(report)
+        await self.check_report_status(report)
 
     async def handle_channel_message(self, message):
         # Only handle messages sent in the "group-#" channel
@@ -172,29 +168,54 @@ class ModBot(discord.Client):
         scores = self.eval_text(message.content)
         # await mod_channel.send(self.code_format(scores))
 
-    async def check_handle_report_complete(self, report):
-        # TODO: add wrapper to this that runs this / checks for mod resolution depending on report status
+    async def handle_report_complete(self, report):
+        # Send the completed report to the mod channel
+        # TODO: instead of showing emojis, show what that emoji means
+        mod_channel = self.mod_channels[report.message.guild.id]
+        report_summary = f'{report.reporter.mention} has reported this message from {report.actor.mention}: {report.message_as_quote()} \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
+        report_summary += 'What is the status of this report?\n'
+        report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
+        report_summary += '📝 The message violates community standards but the report was filed *incorrectly*.\n'
+        report_summary += '🆙 The report is a serious issue that needs to be escalated to a higher level.\n'
+        report_summary += '👍 The reported incident does not violate community standards.'
+
+        report_message = await mod_channel.send(report_summary)
+
+        # Add reactions for the available options
+        # Must be same as MOD_STATUS_EMOJIS
+        options = ['✅', '📝', '🆙', '👍']
+        for option in options:
+            await report_message.add_reaction(option)
+
+    async def handle_mod_resolution(self, report):
+        # Remove report from map
+        self.reports.pop(report.reporter.id)
+
+        # TODO: provide more context/details
+
+        # Send the resolution information to the reporter
+        report_summary_reporter = f"Your report has been reviewed."
+        report_summary_reporter += f"{report.message_as_quote()}\n"
+        report_summary_reporter += f"See the message in context: {report.message.jump_url} \n"
+        report_summary_reporter += f"**Outcome: {report.ruling}** \n"
+        report_summary_reporter += "You are able to appeal this decision."
+
+        await report.reporter.send(report_summary_reporter)
+
+        # Send the resolution information to the actor
+        report_summary_actor = f"Your message has been reported and reviewed:"
+        report_summary_actor += f"{report.message_as_quote()}\n"
+        report_summary_actor += f"See the message in context: {report.message.jump_url} \n"
+        report_summary_actor += f"**Outcome: {report.ruling}**\n"
+        report_summary_actor += "You are able to appeal this decision."
+
+        await report.actor.send(report_summary_actor)
+
+    async def check_report_status(self, report):
         if report.report_is_complete():
-            # Remove report from map
-            # self.reports.pop(report.reporter.id)
-
-            # Send the completed report to the mod channel
-            mod_channel = self.mod_channels[report.message.guild.id]
-            report_summary = f"_{report.report_id}_ \n"
-            report_summary += f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n Responses: {" ".join(report.responses)} \n Comments: {report.comment} \n\n'
-            report_summary += 'What is the status of this report?\n'
-            report_summary += '✅ The message violates community standards and the report was filed *correctly*.\n'
-            report_summary += '📝 The message violates community standards but the report was filed *incorrectly*.\n'
-            report_summary += '🆙 The report is a serious issue that needs to be escalated to a higher level.\n'
-            report_summary += '👍 The reported incident does not violate community standards.'
-
-            report_message = await mod_channel.send(report_summary)
-
-            # Add reactions for the available options
-            # Must be same as MOD_STATUS_EMOJIS
-            options = ['✅', '📝', '🆙', '👍']
-            for option in options:
-                await report_message.add_reaction(option)
+            await self.handle_report_complete(report)
+        if report.report_is_resolved():
+            await self.handle_mod_resolution(report)
 
     ################################################# Helper Functions ##################################################
 
