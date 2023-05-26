@@ -8,6 +8,7 @@ class State(Enum):
     AWAITING_MESSAGE = auto()
     MESSAGE_IDENTIFIED = auto()
     MESSAGE_CLASSIFIED = auto()
+    WAITING_ON_SECONDARY_CLASSIFICATION = auto()
     WAITING_ON_MESSAGE = auto()
     REPORT_COMPLETE = auto()
     REPORT_CANCELLED = auto()
@@ -15,6 +16,9 @@ class State(Enum):
 
 
 CLASSIFICATION_EMOJIS = ["💩", "👿", "💳", "🔪", "✍️", "🙅"]
+SECONDARY_CLASSIFICATION_EMOJIS = ["🧛", "🕵", "🦹"]
+
+# TODO: make a util function for how to format reports, so consistent for user + mod
 
 
 class Report:
@@ -22,11 +26,14 @@ class Report:
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
 
-    def __init__(self, client):
+    def __init__(self, client, reporter):
         self.state = State.REPORT_START
         self.client = client
         self.message = None
         self.comment = "None."
+        self.responses = []
+        self.reporter = client.get_user(reporter)
+        self.actor = None
 
     async def handle_message(self, message):
         '''
@@ -70,9 +77,10 @@ class Report:
             # Begin the reporting flow: get information about the type of abuse
             self.state = State.MESSAGE_IDENTIFIED
             self.message = message
+            self.actor = message.author
 
             return {
-                "messages": [f"You are reporting this message from {message.author.mention}:", f"```{message.author.name}: {message.content}```", "Why are you reporting this message? \n",
+                "messages": [f"You are reporting this message from {self.actor.mention}:", f"```{self.actor.name}: {self.message.content}```", "Why are you reporting this message? \n",
                              "💩 This message contains content that is inappropriate for this context and people shouldn't see it.",
                              "👿 This message is harassment, bullying, or generally mean or hurtful.",
                              "💳 I think that this is a spam message or a scam, not a real person genuinely trying to interact.",
@@ -87,32 +95,40 @@ class Report:
             return {"messages": ["We have received your report. Our moderation team will review the and notify you of the outcome  of the review."], "reactions": []}
 
         # Base case -- something has gone wrong if we reach this
-        return {"messages": ["I'm sorry, I didn't understand that.", "Use the `report` command to begin the reporting process.",
-                             "Use the `cancel` command to cancel the report process."], "reactions": []}
+        self.state = State.REPORT_CANCELLED
+        return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
 
     async def handle_reaction(self, reaction):
-       # Sample: <RawReactionActionEvent
-        # message_id=1110666813022425098
-        # user_id=1098756525004173402
-        # channel_id=1103033289041789052
-        # guild_id=1103033282779676743
-        # emoji=<PartialEmoji animated=False name='👍' id=None>
-        # event_type='REACTION_ADD'
-        # member=<Member id=1098756525004173402 name='stevengo' discriminator='1519' bot=False nick=None
-        #   guild=<Guild id=1103033282779676743 name='CS 152 - Sp23' shard_id=0 chunked=False member_count=235>
-        # >>
         emoji = reaction.emoji.name
 
+        # First-level classification (identify as person being mean)
         if self.state == State.MESSAGE_IDENTIFIED and emoji in CLASSIFICATION_EMOJIS:
+            self.responses.append(emoji)
             if emoji == "🙅":
                 self.state = State.REPORT_CANCELLED
                 return {"messages": ["Your report has been cancelled. Have a nice day!"], "reactions": []}
-            elif emoji == "✍️":
+
+            if emoji == "✍️":
                 self.state = State.WAITING_ON_MESSAGE
                 return {"messages": ["Please help us understand why this message may violate our policies. Your message will be sent to our moderation team for review."], "reactions": []}
-            else:
-                return {"messages": ["We have received your report. Our moderation team will review the report and notify you of the outcome  of the review."], "reactions": []}
+            if emoji == "👿":
+                self.state = State.WAITING_ON_SECONDARY_CLASSIFICATION
+                return {"messages": ["Please tell us more about what is happening.",
+                                     "🧛 This person or message is intimidating or physically threatening.",
+                                     "🕵 This person or message is invading my privacy (stalking, doxxing, revealing of personal information). ",
+                                     "🦹 This person or message is otherwise mean, abusive, or making me uncomfortable."],
+                        "reactions": SECONDARY_CLASSIFICATION_EMOJIS}
+            self.state = State.REPORT_COMPLETE
+            return {"messages": ["We have received your report. Our moderation team will review the report and notify you of the outcome  of the review."], "reactions": []}
 
+        # Second-level classification (identify as cyberbullying)
+        if self.state == State.WAITING_ON_SECONDARY_CLASSIFICATION and emoji in SECONDARY_CLASSIFICATION_EMOJIS:
+            self.responses.append(emoji)
+            self.state = State.REPORT_COMPLETE
+            return {"messages": ["Nice!"], "reactions": []}
+
+        # Hopefully this doesn't happen
+        self.state = State.REPORT_CANCELLED
         return {"messages": ["I'm sorry, something has gone wrong. Please report this error."], "reactions": ["😭"]}
 
     def report_is_complete(self):

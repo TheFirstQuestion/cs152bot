@@ -94,6 +94,9 @@ class ModBot(discord.Client):
         reportResponse = await report.handle_reaction(reaction)
         await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
 
+        # Check if the message is complete
+        await self.check_handle_report_complete(report)
+
     ####################################################### Handlers #####################################################
 
     async def handle_dm(self, message):
@@ -113,7 +116,7 @@ class ModBot(discord.Client):
 
         # If we don't currently have an active report for this user, add one
         if author_id not in self.reports:
-            self.reports[author_id] = Report(self)
+            self.reports[author_id] = Report(self, author_id)
 
         report = self.reports[author_id]
 
@@ -123,15 +126,8 @@ class ModBot(discord.Client):
         reportResponse = await report.handle_message(message)
         await self.send_report_response(reportResponse, message.channel)
 
-        # If the report is complete or cancelled, remove it from our map
-        if report.report_is_complete():
-            # Send the completed report to the mod channel
-            reportedMessage = report.message
-            await self.mod_channels[reportedMessage.guild.id].send(f'{message.author.mention} has reported this message from {reportedMessage.author.mention}: ```{reportedMessage.author.name}: {reportedMessage.content}``` \n See the message in context: {reportedMessage.jump_url} \n\n Comments: {report.comment}')
-            # TODO: make a util function for how to format messages, so consistent for user + mod
-
-            # Remove report from map
-            self.reports.pop(author_id)
+        # Check if the message is complete
+        await self.check_handle_report_complete(report)
 
     async def handle_channel_message(self, message):
         # Only handle messages sent in the "group-#" channel
@@ -144,6 +140,14 @@ class ModBot(discord.Client):
 
         scores = self.eval_text(message.content)
         await mod_channel.send(self.code_format(scores))
+
+    async def check_handle_report_complete(self, report):
+        if report.report_is_complete():
+            # Send the completed report to the mod channel
+            await self.mod_channels[report.message.guild.id].send(f'{report.reporter.mention} has reported this message from {report.actor.mention}: ```{report.actor.name}: {report.message.content}``` \n See the message in context: {report.message.jump_url} \n\n Responses: {" ".join(report.responses)} \n\n Comments: {report.comment}')
+
+            # Remove report from map
+            self.reports.pop(report.reporter.id)
 
     ################################################# Helper Functions ##################################################
 
