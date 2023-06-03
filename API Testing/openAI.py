@@ -16,14 +16,25 @@ class OpenAIClassifier():
             openai.organization = tokens["openAI_org"]
             openai.api_key = tokens['openAI_key']
 
-    def evaluateText(self, text):
+    def evaluateText(self, text, pretty=True):
         # Use moderation model (https://platform.openai.com/docs/api-reference/moderations?lang=python)
         result = openai.Moderation.create(
             input=text,
         )
-        return result.results[0].__dict__["_previous"]
+        if pretty:
+            return asPercentages(result.results[0].__dict__["_previous"]["category_scores"])
+        else:
+            return result.results[0].__dict__["_previous"]
+
+
+def asPercentages(data):
+    # Iterate over the dictionary and update the values
+    for key, value in data.items():
+        percentage = '{:.1%}'.format(value)
+        data[key] = percentage
+    return data
 
 
 if __name__ == "__main__":
-    m = OpenAI()
+    m = OpenAIClassifier()
     pprint(m.evaluateText("I think you're ugly"))

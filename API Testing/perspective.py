@@ -22,7 +22,7 @@ class PerspectiveClassifier():
                 static_discovery=False,
             )
 
-    def evaluateText(self, text):
+    def evaluateText(self, text, pretty=True):
         analyze_request = {
             'comment': {'text': 'friendly greetings from python'},
             'requestedAttributes': {'TOXICITY': {},
@@ -34,11 +34,27 @@ class PerspectiveClassifier():
         }
 
         response = self.client.comments().analyze(body=analyze_request).execute()
-        return response["attributeScores"]
+
+        if pretty:
+            cleaned = {}
+            for category in response["attributeScores"]:
+                cleaned[category.lower(
+                )] = response["attributeScores"][category]["summaryScore"]["value"]
+            return asPercentages(cleaned)
+        else:
+            return response["attributeScores"]
+
+
+def asPercentages(data):
+    # Iterate over the dictionary and update the values
+    for key, value in data.items():
+        percentage = '{:.1%}'.format(value)
+        data[key] = percentage
+    return data
 
 
 if __name__ == "__main__":
-    m = Perspective()
+    m = PerspectiveClassifier()
     pprint(m.evaluateText("I think you're ugly"))
 
 # Perspective’s main attribute is TOXICITY, defined as “a rude, disrespectful, or unreasonable comment that is likely to make you leave a discussion”.
