@@ -22,9 +22,9 @@ class PerspectiveClassifier():
                 static_discovery=False,
             )
 
-    def evaluateText(self, text, pretty=True):
+    def evaluateText(self, text, pretty=True, threshold = 0.9):
         analyze_request = {
-            'comment': {'text': 'friendly greetings from python'},
+            'comment': {'text': text},
             'requestedAttributes': {'TOXICITY': {},
                                     "SEVERE_TOXICITY": {},
                                     "IDENTITY_ATTACK": {},
@@ -37,10 +37,16 @@ class PerspectiveClassifier():
 
         if pretty:
             cleaned = {}
+            # daniel: adding whether it's generally toxic '_flagged'
+            cleaned["flagged"] = False
             for category in response["attributeScores"]:
                 cleaned[category.lower(
                 )] = response["attributeScores"][category]["summaryScore"]["value"]
-            return asPercentages(cleaned)
+                # if any category is above threshold (set to 0.9), flag it
+                if not cleaned["flagged"] and response["attributeScores"][category]["summaryScore"]["value"] > threshold:
+                    cleaned["flagged"] = True
+            # return asPercentages(cleaned)
+            return cleaned
         else:
             return response["attributeScores"]
 
@@ -55,7 +61,23 @@ def asPercentages(data):
 
 if __name__ == "__main__":
     m = PerspectiveClassifier()
-    pprint(m.evaluateText("I think you're ugly"))
+    # pprint(m.evaluateText("I think you're ugly"))
+    texts = ["You ugly bitch",
+                "You need to go to hell and die.",
+                "Sucker and a sore loser.",
+                "What's up, dawg?",
+                "You're spicy.",
+                "You're ridiculous.",
+                "You are a sad potato",
+                "You fucking bastard",
+                "You bloody cunt.",
+                    "I'm going to kill you.",
+                "You little smelly piece of shit.",
+                "You're disgusting. I fucking hate you.",
+                "You faggot."]
+    for text in texts:
+        print(text)
+        pprint(m.evaluateText(text))
 
 # Perspective’s main attribute is TOXICITY, defined as “a rude, disrespectful, or unreasonable comment that is likely to make you leave a discussion”.
 # For social science researchers using Perspective to study harassment, we recommend experimenting with thresholds of 0.7 or 0.9, similar to typical moderation use cases.

@@ -17,7 +17,7 @@ class OpenAIClassifier():
             openai.api_key = tokens['openAI_key']
 
     def evaluateText(self, text, pretty=True):
-        # Use moderation model (https://platform.openai.com/docs/api-reference/moderations?lang=python)
+        # Use moderation model ()
         result = openai.Moderation.create(
             input=text,
         )
@@ -37,4 +37,20 @@ def asPercentages(data):
 
 if __name__ == "__main__":
     m = OpenAIClassifier()
-    pprint(m.evaluateText("I think you're ugly"))
+    texts = ["You ugly bitch",
+                    "You need to go to hell and die.",
+                    "Sucker and a sore loser.",
+                    "What's up, dawg?",
+                    "You're spicy.",
+                    "You're ridiculous.",
+                    "You are a sad potato",
+                    "You fucking bastard",
+                    "You bloody cunt.",
+                     "I'm going to kill you.",
+                    "You little smelly piece of shit.",
+                    "You're disgusting. I fucking hate you.",
+                    "You faggot."]
+    for text in texts:
+        print(text)
+        pprint(m.evaluateText(text, pretty = False))
+    
