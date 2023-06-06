@@ -22,7 +22,7 @@ class PerspectiveClassifier():
                 static_discovery=False,
             )
 
-    def evaluateText(self, text, pretty=True, threshold = 0.9):
+    def evaluateText(self, text, pretty=True, threshold = 0.8):
         analyze_request = {
             'comment': {'text': text},
             'requestedAttributes': {'TOXICITY': {},

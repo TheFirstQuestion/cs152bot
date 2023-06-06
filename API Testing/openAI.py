@@ -2,6 +2,7 @@ import openai
 import os
 import json
 from pprint import pprint
+import time
 
 
 class OpenAIClassifier():
@@ -16,7 +17,7 @@ class OpenAIClassifier():
             openai.organization = tokens["openAI_org"]
             openai.api_key = tokens['openAI_key']
 
-    def evaluateText(self, text, pretty=True):
+    def evaluateText(self, text, pretty=False):
         # Use moderation model ()
         result = openai.Moderation.create(
             input=text,
@@ -52,5 +53,7 @@ if __name__ == "__main__":
                     "You faggot."]
     for text in texts:
         print(text)
-        pprint(m.evaluateText(text, pretty = False))
+        time.sleep(1)
+        pprint(m.evaluateText(text, pretty = True))
+        
     
