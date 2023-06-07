@@ -5,7 +5,7 @@ import csv
 import time
 
 DATA_FOLDER = "../Datasets/"
-DATASETS = ['aggression_parsed_dataset.csv', 
+DATASETS = ['aggression_parsed_dataset.csv',
             "kaggle_parsed_dataset.csv",
             "twitter_parsed_dataset.csv",
             "twitter_racism_parsed_dataset.csv",
@@ -43,8 +43,9 @@ def readCSV(filename, numRows=100):
                 return returnData
         print("len(returnData)", len(returnData))
     return returnData
-        
-def classify(filename, numRows = 250):
+
+
+def classify(filename, numRows=250):
     models = {"openAI": OpenAIClassifier(),
               "perspective": PerspectiveClassifier()}
     csvData = []
@@ -63,18 +64,18 @@ def classify(filename, numRows = 250):
             content = kvp["text"]
             isReallyCyberbullying = kvp["is_cyberbullying"]
             try:
-                eval = model.evaluateText(content)
+                evalResult = model.evaluateText(content)
                 text_class = ''
                 # time buffer for rate limit
                 time.sleep(1)
-                if eval["flagged"] == True:
+                if evalResult["flagged"] == True:
                     if isReallyCyberbullying:
                         TP += 1
                         text_class = 'TP'
                     else:
                         FP += 1
                         text_class = 'FP'
-                elif eval["flagged"] == False:
+                elif evalResult["flagged"] == False:
                     if isReallyCyberbullying:
                         FN += 1
                         text_class = 'FN'
@@ -82,18 +83,20 @@ def classify(filename, numRows = 250):
                         TN += 1
                         text_class = 'TN'
                 TOTAL += 1
-                print(text_class, "Summary: TP,FP,TN,FN,TOTAL,ERRORs:", TP, FP, TN, FN, TOTAL, ERRORS, content)    
+                print(text_class, "Summary: TP,FP,TN,FN,TOTAL,ERRORs:",
+                      TP, FP, TN, FN, TOTAL, ERRORS, content)
             except:
                 time.sleep(1)
                 print("error", content)
-                print(text_class, "Summary: TP,FP,TN,FN,TOTAL,ERRORs:", TP, FP, TN, FN, TOTAL, ERRORS, content) 
+                print(text_class, "Summary: TP,FP,TN,FN,TOTAL,ERRORs:",
+                      TP, FP, TN, FN, TOTAL, ERRORS, content)
                 ERRORS += 1
                 if ERRORS > 20:
                     break
-        print('FINAL', label, "TP, FP, TN, FN, TOTAL, ERRORs", TP, FP, TN, FN, TOTAL, ERRORS)
+        print('FINAL', label, "TP, FP, TN, FN, TOTAL, ERRORs",
+              TP, FP, TN, FN, TOTAL, ERRORS)
 
 
 if __name__ == "__main__":
     classify('final_toxic.csv')
-    classify('final_non_toxic.csv', numRows = 750)
-    
+    classify('final_non_toxic.csv', numRows=750)

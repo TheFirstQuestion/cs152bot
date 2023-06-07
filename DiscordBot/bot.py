@@ -7,7 +7,8 @@ import logging
 import re
 import requests
 from report import Report, State
-import pdb
+from perspective import PerspectiveClassifier
+from openAI import OpenAIClassifier
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -36,6 +37,10 @@ class ModBot(discord.Client):
         self.group_num = None
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
         self.reports = {}  # Map from user IDs to the state of their report
+        self.models = {
+            # "openAI": OpenAIClassifier(),
+            "perspective": PerspectiveClassifier()
+        }
 
     ############################################## Discord Method Overloads ##############################################
     async def on_ready(self):
@@ -168,7 +173,7 @@ class ModBot(discord.Client):
         # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
 
         scores = self.eval_text(message.content)
-        # await mod_channel.send(self.code_format(scores))
+        await mod_channel.send(self.code_format(scores))
 
     async def handle_report_complete(self, report):
         report.sent_to_mods = True
@@ -233,7 +238,15 @@ class ModBot(discord.Client):
         TODO: Once you know how you want to evaluate messages in your channel,
         insert your code here! This will primarily be used in Milestone 3.
         '''
-        return message
+
+        # TODO: formatting
+        retVal = ""
+        for label, model in self.models.items():
+            retVal += str(model.evaluateText(message))
+            retVal += "\n\n"
+
+        print(retVal)
+        return retVal
 
     def code_format(self, text):
         ''''
