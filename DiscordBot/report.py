@@ -24,7 +24,8 @@ SECONDARY_CLASSIFICATION_EMOJIS = ["🧛", "🕵", "🦹"]
 DANGER_EMOJIS = ["⚡", "🆗"]
 BLOCK_EMOJIS = ["🛑", "▶"]
 MOD_STATUS_EMOJIS = ['✅', '📝', '🆙', '👍']
-MOD_PENALTY_EMOJIS = ['👁️', '😡', '‼️', '🧊']  # no, ban, strike, suspend
+# no, ban, strike, suspend, undo
+MOD_PENALTY_EMOJIS = ['👁️', '😡', '‼️', '🧊', "🔄"]
 
 
 class Report:
@@ -43,6 +44,8 @@ class Report:
         self.ruling = None
         self.sent_to_mods = False
         self.auto_escalate = False
+        self.scores = {}
+        self.auto_flagged = False
 
     async def handle_message(self, message):
         '''
@@ -236,11 +239,15 @@ class Report:
             elif emoji == "🧊":
                 self.ruling = "User has been suspended."
                 return {"messages": ["The reported user has been suspended."], "reactions": []}
+            elif emoji == "🔄":
+                # Only for auto-flagged
+                self.ruling = "Automatic actions were undone."
+                return {"messages": ["Automatic actions were undone."], "reactions": []}
 
         # Error handling: don't react to irrelevant emojis
         return
 
-    ###################################################### String Formatting ###############################################
+    ################################################## String Formatting ###############################################
 
     def message_as_quote(self):
         return f"```{self.actor.name}: {self.message.content}```"

@@ -10,6 +10,17 @@ from report import Report, State
 from perspective import PerspectiveClassifier
 from openAI import OpenAIClassifier
 
+
+####################### Constants #######################
+# Thresholds:
+# THRESHOLD_1 = bring to mod's attention
+THRESHOLD_1 = 0.5
+# THRESHOLD_2 = auto-report
+THRESHOLD_2 = 0.8
+
+#########################################################
+
+
 # Set up logging to the console
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -38,7 +49,7 @@ class ModBot(discord.Client):
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
         self.reports = {}  # Map from user IDs to the state of their report
         self.models = {
-            # "openAI": OpenAIClassifier(),
+            "openAI": OpenAIClassifier(),
             "perspective": PerspectiveClassifier()
         }
 
@@ -65,6 +76,9 @@ class ModBot(discord.Client):
             for channel in guild.text_channels:
                 if channel.name == f'group-{self.group_num}-mod':
                     self.mod_channels[guild.id] = channel
+
+        # Ensure we have a list for auto-flagged messages
+        self.reports[self.user.id] = []
 
     async def on_message(self, message):
         '''
@@ -100,17 +114,21 @@ class ModBot(discord.Client):
                 author_id = int(
                     re.search(r"\<@(\d*)\>", message.content).group(1))
 
-                # Only respond to reactions if we are in reporting flow
-                if author_id not in self.reports:
-                    print("no report for this user")
-                    return
+                if author_id == self.user.id:
+                    report = self.reports[self.user.id][-1]
+                else:
 
-                # TODO: probably want to do a thread on the mod side
+                    # Only respond to reactions if we are in reporting flow
+                    if author_id not in self.reports:
+                        print("no report for this user")
+                        return
+
+                    report = self.reports[author_id]
+
                 # Pass this info to the report, and send response
-                report = self.reports[author_id]
+                # TODO: probably want to do a thread on the mod side
                 reportResponse = await report.handle_reaction(reaction)
-                await self.send_report_response(reportResponse, channel)
-
+                await self.send_message_with_reactions(reportResponse, channel)
                 # Check if the report is complete
                 await self.check_report_status(report)
 
@@ -125,7 +143,7 @@ class ModBot(discord.Client):
             # Pass this info to the report, and send response
             report = self.reports[author_id]
             reportResponse = await report.handle_reaction(reaction)
-            await self.send_report_response(reportResponse, self.get_user(reaction.user_id))
+            await self.send_message_with_reactions(reportResponse, self.get_user(reaction.user_id))
 
             # Check if the report is complete
             await self.check_report_status(report)
@@ -157,7 +175,7 @@ class ModBot(discord.Client):
 
         # Let the report class handle this message; forward all the messages it returns to us
         reportResponse = await report.handle_message(message)
-        await self.send_report_response(reportResponse, message.channel)
+        await self.send_message_with_reactions(reportResponse, message.channel)
 
         # Check if the message is complete
         await self.check_report_status(report)
@@ -172,8 +190,8 @@ class ModBot(discord.Client):
         mod_channel = self.mod_channels[message.guild.id]
         # await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
 
-        scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
+        eval_response = await self.eval_text(message)
+        await self.send_message_with_reactions(eval_response, mod_channel)
 
     async def handle_report_complete(self, report):
         report.sent_to_mods = True
@@ -202,18 +220,18 @@ class ModBot(discord.Client):
             await report_message.add_reaction(option)
 
     async def handle_mod_resolution(self, report):
-        # Remove report from map
-        self.reports.pop(report.reporter.id)
+        if not report.auto_flagged:
+            # Remove report from map
+            self.reports.pop(report.reporter.id)
+            # TODO: provide more context/details
+            # Send the resolution information to the reporter
+            report_summary_reporter = f"Your report has been reviewed."
+            report_summary_reporter += f"{report.message_as_quote()}\n"
+            report_summary_reporter += f"See the message in context: {report.message.jump_url} \n"
+            report_summary_reporter += f"**Outcome: {report.ruling}** \n"
+            report_summary_reporter += "You are able to appeal this decision."
 
-        # TODO: provide more context/details
-        # Send the resolution information to the reporter
-        report_summary_reporter = f"Your report has been reviewed."
-        report_summary_reporter += f"{report.message_as_quote()}\n"
-        report_summary_reporter += f"See the message in context: {report.message.jump_url} \n"
-        report_summary_reporter += f"**Outcome: {report.ruling}** \n"
-        report_summary_reporter += "You are able to appeal this decision."
-
-        await report.reporter.send(report_summary_reporter)
+            await report.reporter.send(report_summary_reporter)
 
         # Send the resolution information to the actor, unless there is a threat of danger
         if not report.auto_escalate:
@@ -233,30 +251,85 @@ class ModBot(discord.Client):
 
     ################################################# Helper Functions ##################################################
 
-    def eval_text(self, message):
-        ''''
-        TODO: Once you know how you want to evaluate messages in your channel,
-        insert your code here! This will primarily be used in Milestone 3.
-        '''
-
-        # TODO: formatting
-        retVal = ""
+    async def eval_text(self, message):
+        # Evaluate the message as toxic or not
+        scores = {}
         for label, model in self.models.items():
-            retVal += str(model.evaluateText(message))
-            retVal += "\n\n"
+            try:
+                scores[label] = model.evaluateText(message.content)
+            except Exception as e:
+                # If we can't classify it, let the mods know the system is down
+                print(str(e))
 
-        print(retVal)
-        return retVal
+        # Check if all the classifiers are broken
+        if scores is {}:
+            return {"messages": ["The auto-moderation system is down. Thank you for your patience."], "reactions": ["🥲"]}
 
-    def code_format(self, text):
-        ''''
-        TODO: Once you know how you want to show that a message has been
-        evaluated, insert your code here for formatting the string to be
-        shown in the mod channel.
-        '''
-        return "Evaluated: '" + text + "'"
+        # TODO: this filtering can be more complex
+        try:
+            # Parse percentage as float
+            perspective_score = float(scores["perspective"]["toxicity"][:-1])
+        except KeyError:
+            perspective_score = 0
 
-    async def send_report_response(self, response, channel):
+        try:
+            flaggedByOpenAI = scores["openAI"]["flagged"]
+        except KeyError:
+            flaggedByOpenAI = False
+
+        # Testing only
+        perspectiveScore = 1
+
+        # TODO: fix the % in the message below if Perspective is down
+
+        # The message is clearly toxic, so go ahead and yeet them
+        if perspectiveScore >= THRESHOLD_2 or flaggedByOpenAI:
+            # Create the report
+            # IRL, we should probs delay this a bit so that the mod can undo before the user gets notified
+            report = Report(self, self.user.id)
+            report.message = message
+            report.actor = message.author
+            report.scores = scores
+            report.sent_to_mods = True
+            report.auto_flagged = True
+            report.state = State.MOD_CHOOSE_PENALTY
+
+            self.reports[self.user.id].append(report)
+
+            # Check if the message is complete
+            await self.check_report_status(report)
+
+            return {"messages": [
+                f'{self.user.mention} has flagged a message from {message.author.mention}: ```{message.author.name}: {message.content}``` See it in context: {message.jump_url}\n',
+                f'The system estimates a **{scores["perspective"]["toxicity"]}** chance this is a toxic message.',
+                f'The user ({message.author.mention}) has been given a strike.',
+                "**No action is necessary.**\n",
+                "😡 Ban the reported user.",
+                "🧊 Suspend the reported user.",
+                "🔄 Undo this action - remove the strike.",
+            ],
+                "reactions": ["😡", "🧊", "🔄"]
+            }
+        # Not super confident that it's toxic, but maybe -- ask the mod!
+        elif perspectiveScore >= THRESHOLD_1:
+            # TODO: start the report
+
+            return {"messages": [
+                f'{self.user.mention} has flagged a message from {message.author.mention}: ```{message.author.name}: {message.content}``` See it in context: {message.jump_url}\n',
+                "**Action Needed:**",
+                f'The system estimates a **{scores["perspective"]["toxicity"]}** chance this is a toxic message.',
+                "React 🚫 to initiate the reporting process.",
+            ],
+                "reactions": ["🚫"]
+            }
+        # Message is fine
+        else:
+            return
+
+    async def send_message_with_reactions(self, response, channel):
+        if response is None:
+            return
+
         # Send the bot's response message
         responseText = ""
         for m in response["messages"]:

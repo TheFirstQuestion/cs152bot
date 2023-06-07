@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix
 
 
-DATASET_PATH = "Confusion_Matrix_Data/2023-06-06_20-46-20_perspective.csv"
+DATASET_PATH = "Confusion_Matrix_Data/2023-06-07_10-32-10_openAI.csv"
 
 
 if __name__ == "__main__":

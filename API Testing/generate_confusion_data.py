@@ -5,6 +5,7 @@ import csv
 from datetime import datetime
 from tqdm import tqdm
 from langdetect import detect
+import time
 
 
 DATA_FOLDER = "../Datasets/"
@@ -54,12 +55,13 @@ if __name__ == "__main__":
     current_datetime = datetime.now()
     timestamp = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
 
-    models = {"openAI": OpenAIClassifier(),
-              "perspective": PerspectiveClassifier()}
+    models = {
+        # "openAI": OpenAIClassifier(),
+        "perspective": PerspectiveClassifier()}
 
     # These are the categories rated by each model
     headers = {"openAI": ['violence/graphic',
-                          'self-harm', 'hate/threatening', 'sexual/minors', 'hate', 'violence', 'sexual'],
+                          'self-harm', 'hate/threatening', 'sexual/minors', 'hate', 'violence', 'sexual', "flagged"],
                "perspective": ['threat', 'insult', 'identity_attack', 'flagged', 'severe_toxicity', 'profanity', 'toxicity', "sexually_explicit", "flirtation"]}
 
     print()
@@ -73,12 +75,15 @@ if __name__ == "__main__":
 
             print(f"Evaluating data using {label}...")
             for kvp in tqdm(data):
+                time.sleep(2)
                 try:
                     result = model.evaluateText(kvp["text"])
                     writer.writerow({**kvp, **result})
-                except:
+                except Exception as e:
                     # Just ignore it if there's an error
+                    print("An error occurred:", str(e))
                     pass
+
 
 # Run 2023-06-06_20-46-20 took 8m 35s
 # Reading data for final_toxic.csv...

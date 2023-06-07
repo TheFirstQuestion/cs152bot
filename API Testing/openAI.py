@@ -24,7 +24,7 @@ class OpenAIClassifier():
         )
         if pretty:
             # return asPercentages(result.results[0].__dict__["_previous"]["category_scores"])
-            return result.results[0].__dict__["_previous"]["category_scores"]
+            return {**result.results[0].__dict__["_previous"]["category_scores"], "flagged": result.results[0].__dict__["_previous"]["flagged"]}
         else:
             return result.results[0].__dict__["_previous"]
 
