@@ -9,7 +9,7 @@ This is our CS 152 final project: a Discord moderation bot that focuses on cyber
 Install the following packages:
 
 ```bash
-discord openai google-api-python-client 
+discord openai google-api-python-client langdetect
 ```
 
 Create `DiscordBot/tokens.json` and/or `API Testing/tokens.json`.

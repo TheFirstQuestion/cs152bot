@@ -30,7 +30,9 @@ class PerspectiveClassifier():
                                     "IDENTITY_ATTACK": {},
                                     "INSULT": {},
                                     "PROFANITY": {},
-                                    "THREAT": {}}
+                                    "THREAT": {},
+                                    "SEXUALLY_EXPLICIT": {},
+                                    "FLIRTATION": {}}
         }
 
         response = self.client.comments().analyze(body=analyze_request).execute()

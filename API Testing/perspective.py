@@ -30,7 +30,9 @@ class PerspectiveClassifier():
                                     "IDENTITY_ATTACK": {},
                                     "INSULT": {},
                                     "PROFANITY": {},
-                                    "THREAT": {}}
+                                    "THREAT": {},
+                                    "SEXUALLY_EXPLICIT": {},
+                                    "FLIRTATION": {}}
         }
 
         response = self.client.comments().analyze(body=analyze_request).execute()
@@ -45,8 +47,8 @@ class PerspectiveClassifier():
                 # if any category is above threshold (set to 0.9), flag it
                 if not cleaned["flagged"] and response["attributeScores"][category]["summaryScore"]["value"] > threshold:
                     cleaned["flagged"] = True
-            return asPercentages(cleaned)
-            # return cleaned
+            # return asPercentages(cleaned)
+            return cleaned
         else:
             return response["attributeScores"]
 

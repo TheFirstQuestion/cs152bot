@@ -23,7 +23,8 @@ class OpenAIClassifier():
             input=text,
         )
         if pretty:
-            return asPercentages(result.results[0].__dict__["_previous"]["category_scores"])
+            # return asPercentages(result.results[0].__dict__["_previous"]["category_scores"])
+            return result.results[0].__dict__["_previous"]["category_scores"]
         else:
             return result.results[0].__dict__["_previous"]
 
