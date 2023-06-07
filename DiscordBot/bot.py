@@ -14,9 +14,9 @@ from openAI import OpenAIClassifier
 ####################### Constants #######################
 # Thresholds (percentages)
 # THRESHOLD_1 = bring to mod's attention
-THRESHOLD_1 = 80
+THRESHOLD_1 = 90
 # THRESHOLD_2 = auto-report
-THRESHOLD_2 = 90
+THRESHOLD_2 = 95
 #########################################################
 
 
