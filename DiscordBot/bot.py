@@ -12,12 +12,11 @@ from openAI import OpenAIClassifier
 
 
 ####################### Constants #######################
-# Thresholds:
+# Thresholds (percentages)
 # THRESHOLD_1 = bring to mod's attention
-THRESHOLD_1 = 0.5
+THRESHOLD_1 = 80
 # THRESHOLD_2 = auto-report
-THRESHOLD_2 = 0.8
-
+THRESHOLD_2 = 90
 #########################################################
 
 
@@ -261,26 +260,29 @@ class ModBot(discord.Client):
                 # If we can't classify it, let the mods know the system is down
                 print(str(e))
 
-        # Check if all the classifiers are broken
+        # If all the classifiers are broken, cry
         if scores is {}:
             return {"messages": ["The auto-moderation system is down. Thank you for your patience."], "reactions": ["🥲"]}
 
-        # TODO: this filtering can be more complex
+        # Check individual classifiers for errors
         try:
             # Parse percentage as float
-            perspective_score = float(scores["perspective"]["toxicity"][:-1])
+            perspectiveError = False
+            perspectiveScore = float(scores["perspective"]["toxicity"][:-1])
         except KeyError:
-            perspective_score = 0
+            perspectiveError = True
+            perspectiveScore = 0
 
         try:
+            openAIError = False
             flaggedByOpenAI = scores["openAI"]["flagged"]
         except KeyError:
+            openAIError = True
             flaggedByOpenAI = False
 
-        # Testing only
-        perspectiveScore = 1
+        statementOfConfidence = "The system believes this is a toxic message." if perspectiveError else f'The system estimates a **{perspectiveScore}%** chance this is a toxic message.'
 
-        # TODO: fix the % in the message below if Perspective is down
+        # TODO: this filtering can be more complex
 
         # The message is clearly toxic, so go ahead and yeet them
         if perspectiveScore >= THRESHOLD_2 or flaggedByOpenAI:
@@ -293,15 +295,11 @@ class ModBot(discord.Client):
             report.sent_to_mods = True
             report.auto_flagged = True
             report.state = State.MOD_CHOOSE_PENALTY
-
             self.reports[self.user.id].append(report)
-
-            # Check if the message is complete
-            await self.check_report_status(report)
 
             return {"messages": [
                 f'{self.user.mention} has flagged a message from {message.author.mention}: ```{message.author.name}: {message.content}``` See it in context: {message.jump_url}\n',
-                f'The system estimates a **{scores["perspective"]["toxicity"]}** chance this is a toxic message.',
+                statementOfConfidence,
                 f'The user ({message.author.mention}) has been given a strike.',
                 "**No action is necessary.**\n",
                 "😡 Ban the reported user.",
@@ -310,14 +308,22 @@ class ModBot(discord.Client):
             ],
                 "reactions": ["😡", "🧊", "🔄"]
             }
-        # Not super confident that it's toxic, but maybe -- ask the mod!
+        # Not super confident that it's toxic, but very possible -- ask the mod!
         elif perspectiveScore >= THRESHOLD_1:
-            # TODO: start the report
+            # Create the report
+            report = Report(self, self.user.id)
+            report.message = message
+            report.actor = message.author
+            report.scores = scores
+            report.sent_to_mods = True
+            report.auto_flagged = True
+            report.state = State.REPORT_COMPLETE
+            self.reports[self.user.id].append(report)
 
             return {"messages": [
                 f'{self.user.mention} has flagged a message from {message.author.mention}: ```{message.author.name}: {message.content}``` See it in context: {message.jump_url}\n',
                 "**Action Needed:**",
-                f'The system estimates a **{scores["perspective"]["toxicity"]}** chance this is a toxic message.',
+                statementOfConfidence,
                 "React 🚫 to initiate the reporting process.",
             ],
                 "reactions": ["🚫"]

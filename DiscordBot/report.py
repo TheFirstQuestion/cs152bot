@@ -23,7 +23,7 @@ CLASSIFICATION_EMOJIS = ["💩", "👿", "💳", "🔪", "✍️", "🙅"]
 SECONDARY_CLASSIFICATION_EMOJIS = ["🧛", "🕵", "🦹"]
 DANGER_EMOJIS = ["⚡", "🆗"]
 BLOCK_EMOJIS = ["🛑", "▶"]
-MOD_STATUS_EMOJIS = ['✅', '📝', '🆙', '👍']
+MOD_STATUS_EMOJIS = ['✅', '📝', '🆙', '👍', "🚫"]  # last is only for auto-flag
 # no, ban, strike, suspend, undo
 MOD_PENALTY_EMOJIS = ['👁️', '😡', '‼️', '🧊', "🔄"]
 
@@ -201,6 +201,17 @@ class Report:
                                      "🔪 This message could lead to bad stuff happening offline.",
                                      "✍️ None of these, some other reason.",
                                      "🙅 The reporter didn't mean to report this message! No action needed."],
+                        "reactions": CLASSIFICATION_EMOJIS}
+            elif emoji == "🚫":
+                self.state = State.MOD_RECLASSIFY
+                return {"messages": [self.message_context(),
+                                     "Please choose the correct classification.",
+                                     "💩 This message contains content that is inappropriate for this context and people shouldn't see it.",
+                                     "👿 This message is harassment, bullying, or generally mean or hurtful.",
+                                     "💳 This is a spam message or a scam, not a real person genuinely trying to interact.",
+                                     "🔪 This message could lead to bad stuff happening offline.",
+                                     "✍️ None of these, some other reason.",
+                                     "🙅 Never mind! No action needed."],
                         "reactions": CLASSIFICATION_EMOJIS}
             elif emoji == '🆙':
                 self.state = State.RESOLVED_BY_MOD
